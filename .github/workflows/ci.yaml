@@ -2,9 +2,9 @@
 name: PyYAML CI
 
 on:
-  push:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # Automatic CI lives in wheels.yaml; this upstream matrix stays available
+  # for manual full builds (dispatch with skip_artifact_upload=false to get
+  # the dist-pyyaml-* artifact).
   workflow_dispatch:
     inputs:
       libyaml_repo:

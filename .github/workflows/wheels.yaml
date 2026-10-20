@@ -1,0 +1,350 @@
+name: wheels
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests / ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.13t"
+          - "3.14"
+          - "3.14t"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+      - name: Run tests
+        env:
+          PYTHONPATH: lib
+        run: |
+          python -m pip install pytest
+          python -m pytest tests/legacy_tests
+
+  sdist:
+    name: sdist
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Build sdist
+        env:
+          PYYAML_FORCE_CYTHON: "1"
+          PYYAML_FORCE_LIBYAML: "0"
+        run: |
+          python -m pip install build
+          python -m build -s .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: wheels / ${{ matrix.name }}
+    needs: sdist
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: manylinux2014 x86_64
+            os: ubuntu-24.04
+            archs: x86_64
+            cibw_build: >-
+              cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64
+              cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64
+              cp313t-manylinux_x86_64 cp314-manylinux_x86_64 cp314t-manylinux_x86_64
+            manylinux_image: quay.io/pypa/manylinux2014_x86_64:2026.05.02-2
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: manylinux2014_x86_64
+            expected_count: 9
+            elf_machine: Advanced Micro Devices X86-64
+            artifact_name: wheel-manylinux2014-x86_64
+          - name: manylinux2014 aarch64
+            os: ubuntu-24.04-arm
+            archs: aarch64
+            cibw_build: >-
+              cp38-manylinux_aarch64 cp39-manylinux_aarch64 cp310-manylinux_aarch64
+              cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64
+              cp313t-manylinux_aarch64 cp314-manylinux_aarch64 cp314t-manylinux_aarch64
+            manylinux_image: quay.io/pypa/manylinux2014_aarch64:2026.05.02-2
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: manylinux2014_aarch64
+            expected_count: 9
+            elf_machine: AArch64
+            artifact_name: wheel-manylinux2014-aarch64
+          - name: manylinux2014 s390x
+            os: ubuntu-24.04
+            archs: s390x
+            qemu: s390x
+            cibw_build: >-
+              cp38-manylinux_s390x cp39-manylinux_s390x cp310-manylinux_s390x
+              cp311-manylinux_s390x cp312-manylinux_s390x cp313-manylinux_s390x
+              cp313t-manylinux_s390x cp314-manylinux_s390x cp314t-manylinux_s390x
+            manylinux_image: quay.io/pypa/manylinux2014_s390x:2026.05.02-2
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: manylinux2014_s390x
+            expected_count: 9
+            elf_machine: IBM S/390
+            artifact_name: wheel-manylinux2014-s390x
+          - name: musllinux_1_2 x86_64
+            os: ubuntu-24.04
+            archs: x86_64
+            cibw_build: >-
+              cp38-musllinux_x86_64 cp39-musllinux_x86_64 cp310-musllinux_x86_64
+              cp311-musllinux_x86_64 cp312-musllinux_x86_64 cp313-musllinux_x86_64
+              cp313t-musllinux_x86_64 cp314-musllinux_x86_64 cp314t-musllinux_x86_64
+            musllinux_image: quay.io/pypa/musllinux_1_2_x86_64:2026.05.02-2
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: musllinux_1_2_x86_64
+            expected_count: 9
+            elf_machine: Advanced Micro Devices X86-64
+            artifact_name: wheel-musllinux_1_2-x86_64
+          - name: musllinux_1_2 aarch64
+            os: ubuntu-24.04-arm
+            archs: aarch64
+            cibw_build: >-
+              cp38-musllinux_aarch64 cp39-musllinux_aarch64 cp310-musllinux_aarch64
+              cp311-musllinux_aarch64 cp312-musllinux_aarch64 cp313-musllinux_aarch64
+              cp313t-musllinux_aarch64 cp314-musllinux_aarch64 cp314t-musllinux_aarch64
+            musllinux_image: quay.io/pypa/musllinux_1_2_aarch64:2026.05.02-2
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: musllinux_1_2_aarch64
+            expected_count: 9
+            elf_machine: AArch64
+            artifact_name: wheel-musllinux_1_2-aarch64
+          - name: macOS x86_64
+            os: macos-15-intel
+            archs: x86_64
+            cibw_build: >-
+              cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64
+              cp311-macosx_x86_64 cp312-macosx_x86_64 cp313-macosx_x86_64
+              cp313t-macosx_x86_64 cp314-macosx_x86_64 cp314t-macosx_x86_64
+            deployment_target: "10.13"
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: macosx_.*_x86_64
+            expected_count: 9
+            lipo_arch: x86_64
+            artifact_name: wheel-macosx-x86_64
+          - name: macOS arm64
+            os: macos-15
+            archs: arm64
+            install_native_py38: true
+            cibw_build: >-
+              cp38-macosx_arm64 cp39-macosx_arm64 cp310-macosx_arm64
+              cp311-macosx_arm64 cp312-macosx_arm64 cp313-macosx_arm64
+              cp313t-macosx_arm64 cp314-macosx_arm64 cp314t-macosx_arm64
+            deployment_target: "11.0"
+            build_config: '{"force":1, "library_dirs": ["../libyaml/src/.libs"], "include_dirs": ["../libyaml/include"]}'
+            wheel_tag: macosx_.*_arm64
+            expected_count: 9
+            lipo_arch: arm64
+            artifact_name: wheel-macosx-arm64
+          - name: Windows amd64
+            os: windows-2022
+            archs: AMD64
+            cmake_arch: x64
+            cibw_build: >-
+              cp38-win_amd64 cp39-win_amd64 cp310-win_amd64 cp311-win_amd64
+              cp312-win_amd64 cp313-win_amd64 cp313t-win_amd64 cp314-win_amd64
+              cp314t-win_amd64
+            build_config: '{"force":1, "include_dirs": ["../libyaml/include"], "library_dirs": ["../libyaml/build/Release"], "define": [["YAML_DECLARE_STATIC", 1]]}'
+            wheel_tag: win_amd64
+            expected_count: 9
+            artifact_name: wheel-win_amd64
+          - name: Windows win32
+            os: windows-2022
+            archs: x86
+            cmake_arch: Win32
+            cibw_build: >-
+              cp38-win32 cp39-win32 cp310-win32 cp311-win32 cp312-win32 cp313-win32
+              cp313t-win32 cp314-win32 cp314t-win32
+            build_config: '{"force":1, "include_dirs": ["../libyaml/include"], "library_dirs": ["../libyaml/build/Release"], "define": [["YAML_DECLARE_STATIC", 1]]}'
+            wheel_tag: win32
+            expected_count: 9
+            artifact_name: wheel-win32
+          - name: Windows arm64
+            os: windows-11-arm
+            archs: ARM64
+            cmake_arch: ARM64
+            cibw_build: >-
+              cp39-win_arm64 cp310-win_arm64 cp311-win_arm64 cp312-win_arm64
+              cp313-win_arm64 cp313t-win_arm64 cp314-win_arm64 cp314t-win_arm64
+            build_config: '{"force":1, "include_dirs": ["../libyaml/include"], "library_dirs": ["../libyaml/build/Release"], "define": [["YAML_DECLARE_STATIC", 1]]}'
+            wheel_tag: win_arm64
+            expected_count: 8
+            artifact_name: wheel-win_arm64
+    env:
+      CIBW_ARCHS: ${{ matrix.archs }}
+      CIBW_BUILD: ${{ matrix.cibw_build }}
+      CIBW_BUILD_VERBOSITY: "1"
+      # cibuildwheel v3 only builds the cp313t wheels when this group is enabled
+      CIBW_ENABLE: cpython-freethreading
+      CIBW_TEST_COMMAND: pytest {package}
+      CIBW_TEST_REQUIRES: pytest
+      # containerized Linux builds do not inherit the job environment
+      CIBW_ENVIRONMENT_LINUX: >-
+        LD_LIBRARY_PATH=../libyaml/src/.libs
+        PYYAML_FORCE_CYTHON=1
+        PYYAML_FORCE_LIBYAML=1
+      CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
+      CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.manylinux_image }}
+      CIBW_MANYLINUX_S390X_IMAGE: ${{ matrix.manylinux_image }}
+      CIBW_MUSLLINUX_X86_64_IMAGE: ${{ matrix.musllinux_image }}
+      CIBW_MUSLLINUX_AARCH64_IMAGE: ${{ matrix.musllinux_image }}
+      C_INCLUDE_PATH: ../libyaml/include
+      LIBRARY_PATH: ../libyaml/src/.libs
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
+      PYYAML_FORCE_CYTHON: "1"
+      PYYAML_FORCE_LIBYAML: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.qemu }}
+      # cibuildwheel only knows the x86_64 CPython 3.8 installer, so an arm64
+      # CPython 3.8 has to be installed for a native build and test.
+      - name: Install native arm64 CPython 3.8
+        if: matrix.install_native_py38
+        run: |
+          curl -fsSL -o /tmp/Python38.pkg https://www.python.org/ftp/python/3.8.10/python-3.8.10-macos11.pkg
+          sudo installer -pkg /tmp/Python38.pkg -target /
+          sh "/Applications/Python 3.8/Install Certificates.command"
+          /Library/Frameworks/Python.framework/Versions/3.8/bin/python3 -c \
+            'import platform; print(platform.machine()); assert platform.machine() == "arm64"'
+      - name: Build libyaml (macOS)
+        if: runner.os == 'macOS'
+        env:
+          LIBYAML_REPO: https://github.com/yaml/libyaml
+          LIBYAML_REF: "0.2.5"
+        run: |
+          brew install automake coreutils m4 libtool
+          bash packaging/build/libyaml.sh
+          lipo -archs libyaml/src/.libs/libyaml.a
+      - name: Build libyaml (Linux)
+        if: runner.os == 'Linux'
+        env:
+          LIBYAML_REPO: https://github.com/yaml/libyaml
+          LIBYAML_REF: "0.2.5"
+          DOCKER_IMAGE: ${{ matrix.manylinux_image || matrix.musllinux_image }}
+        run: |
+          docker run --rm -v "$(pwd):/io" -e LIBYAML_REF -e LIBYAML_REPO -w /io \
+            "$DOCKER_IMAGE" /io/packaging/build/libyaml.sh
+          sudo chmod -R a+r ./libyaml
+      - name: Build libyaml (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 0.2.5 https://github.com/yaml/libyaml libyaml
+          cmake -S libyaml -B libyaml/build -G "Visual Studio 17 2022" \
+            -A ${{ matrix.cmake_arch }} -DYAML_STATIC_LIB_NAME=yaml
+          cmake --build libyaml/build --config Release
+      - uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: sdist
+      - name: Build and test wheels
+        shell: bash
+        run: |
+          mkdir pyyaml
+          tar zxf sdist/pyyaml-*.tar.gz --strip-components=1 -C pyyaml
+          python -m pip install "cibuildwheel==3.4.1"
+          cat > build_config.toml <<EOF
+          [tool.cibuildwheel.config-settings]
+          pyyaml_build_config='${{ matrix.build_config }}'
+          EOF
+          python -m cibuildwheel --config-file build_config.toml --platform auto --output-dir ./dist ./pyyaml
+      - name: Check wheels
+        shell: bash
+        run: |
+          test "$(ls dist/*.whl | wc -l)" -eq ${{ matrix.expected_count }}
+          for whl in dist/*.whl; do
+            if ! basename "$whl" | grep -q '${{ matrix.wheel_tag }}'; then
+              echo "unexpected wheel: $whl"
+              exit 1
+            fi
+          done
+      - name: Check wheel binaries (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for whl in dist/*.whl; do
+            d=$(mktemp -d)
+            unzip -q "$whl" -d "$d"
+            so=$(find "$d" -name '_yaml*.so')
+            readelf -h "$so" | grep -q '${{ matrix.elf_machine }}'
+            if readelf -d "$so" | grep -qi yaml; then
+              echo "$whl links libyaml dynamically"
+              exit 1
+            fi
+            rm -rf "$d"
+          done
+      - name: Check wheel binaries (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          for whl in dist/*.whl; do
+            d=$(mktemp -d)
+            unzip -q "$whl" -d "$d"
+            so=$(find "$d" -name '_yaml*.so')
+            lipo -archs "$so" | grep -q '${{ matrix.lipo_arch }}'
+            if otool -L "$so" | grep -q libyaml; then
+              echo "$whl links libyaml dynamically"
+              exit 1
+            fi
+            rm -rf "$d"
+          done
+      - name: Check wheel binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import glob, zipfile
+          for whl in glob.glob("dist/*.whl"):
+              with zipfile.ZipFile(whl) as zf:
+                  names = zf.namelist()
+              assert any(n.startswith("yaml/_yaml") and n.endswith(".pyd") for n in names), whl
+          EOF
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  merge:
+    name: merge wheels
+    needs: wheels
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/upload-artifact/merge@v7
+        with:
+          name: wheels
+          pattern: wheel-*
+          delete-merged: true
