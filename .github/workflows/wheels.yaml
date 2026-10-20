@@ -264,7 +264,8 @@ jobs:
         run: |
           git clone --depth 1 --branch 0.2.5 https://github.com/yaml/libyaml libyaml
           cmake -S libyaml -B libyaml/build -G "Visual Studio 17 2022" \
-            -A ${{ matrix.cmake_arch }} -DYAML_STATIC_LIB_NAME=yaml
+            -A ${{ matrix.cmake_arch }} -DYAML_STATIC_LIB_NAME=yaml \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           cmake --build libyaml/build --config Release
       - uses: actions/download-artifact@v8
         with:
